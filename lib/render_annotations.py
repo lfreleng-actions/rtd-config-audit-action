@@ -21,13 +21,23 @@ COMMANDS = {
 }
 
 
-def escape(value: str) -> str:
-    """Escape a value for use inside a workflow command.
+def escape_data(value: str) -> str:
+    """Escape the message portion of a workflow command.
 
-    GitHub treats newlines and the percent sign as control characters
-    within a command, so replace them with their documented escapes.
+    GitHub treats the percent sign and line breaks as control characters
+    inside a command, so replace them with their documented escapes.
     """
     return value.replace("%", "%25").replace("\r", "%0D").replace("\n", "%0A")
+
+
+def escape_property(value: str) -> str:
+    """Escape a property value such as ``title`` or ``file``.
+
+    A property list separates entries with commas and each key from its
+    value with a colon, so both need escaping on top of the rules that
+    apply to the message.
+    """
+    return escape_data(value).replace(":", "%3A").replace(",", "%2C")
 
 
 def command_for(entry: dict[str, object]) -> str | None:
@@ -36,10 +46,10 @@ def command_for(entry: dict[str, object]) -> str | None:
     if command is None:
         return None
 
-    title = escape(f"RTD audit: {entry.get('code', '')}")
-    message = escape(str(entry.get("message", "")))
+    title = escape_property(f"RTD audit: {entry.get('code', '')}")
+    message = escape_data(str(entry.get("message", "")))
     path = entry.get("path")
-    location = f",file={escape(str(path))}" if path else ""
+    location = f",file={escape_property(str(path))}" if path else ""
     return f"::{command} title={title}{location}::{message}"
 
 

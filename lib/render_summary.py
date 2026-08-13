@@ -43,6 +43,15 @@ def property_rows(report: dict[str, object]) -> list[str]:
     ]
 
 
+def flatten(text: str) -> str:
+    """Collapse a message onto one line.
+
+    A parser error carries the offending YAML across several lines, and a
+    raw newline inside a table cell ends the table.
+    """
+    return " ".join(text.split())
+
+
 def finding_rows(report: dict[str, object]) -> list[str]:
     """Build the findings table for a report."""
     raw = report.get("findings")
@@ -55,7 +64,7 @@ def finding_rows(report: dict[str, object]) -> list[str]:
             continue
         entry = cast("dict[str, object]", item)
         icon = SEVERITY_ICON.get(str(entry.get("severity", "")), "")
-        message = str(entry.get("message", "")).replace("|", "\\|")
+        message = flatten(str(entry.get("message", ""))).replace("|", "\\|")
         rows.append(f"| {icon} | {message} |")
     rows.append("")
     return rows

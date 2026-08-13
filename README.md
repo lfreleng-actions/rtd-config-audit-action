@@ -156,7 +156,9 @@ the release calendar for the whole organisation.
 
 | Code                     | Severity | Meaning                                                    |
 | ------------------------ | -------- | ---------------------------------------------------------- |
+| `path-missing`           | Error    | The `path_prefix` directory does not exist                 |
 | `config-missing`         | Error    | No ReadTheDocs configuration found                         |
+| `config-unreadable`      | Error    | The configuration exists but resists reading               |
 | `config-unparsable`      | Error    | The configuration is not valid YAML                        |
 | `config-empty`           | Error    | The configuration file holds nothing                       |
 | `config-not-mapping`     | Error    | The top level is not a mapping                             |

@@ -131,6 +131,44 @@ outputs:
 runs:
   using: "composite"
   steps:
+    # Validate boolean inputs before anything consumes them. The
+    # supported-versions step below gates on offline_mode, so a value
+    # such as 'True' or 'yes' would otherwise pass silently and run the
+    # opposite of what the caller intended.
+    - name: "Validate inputs"
+      id: validate
+      shell: bash
+      env:
+        INPUT_REQUIRE_SPHINX_STRICT: ${{ inputs.require_sphinx_strict }}
+        INPUT_FAIL_ON_WARNING: ${{ inputs.fail_on_warning }}
+        INPUT_OFFLINE_MODE: ${{ inputs.offline_mode }}
+        INPUT_SUMMARY: ${{ inputs.summary }}
+        INPUT_EOL_BEHAVIOUR: ${{ inputs.eol_behaviour }}
+        INPUT_LINKCHECK_POLICY: ${{ inputs.linkcheck_policy }}
+      run: |
+        # Validate inputs
+        set -euo pipefail
+
+        for flag in "$INPUT_REQUIRE_SPHINX_STRICT" "$INPUT_FAIL_ON_WARNING" \
+                    "$INPUT_SUMMARY" "$INPUT_OFFLINE_MODE"; do
+          if [ "$flag" != "true" ] && [ "$flag" != "false" ]; then
+            echo 'Error: boolean inputs accept only true or false ❌'
+            exit 1
+          fi
+        done
+
+        for policy in "$INPUT_EOL_BEHAVIOUR" "$INPUT_LINKCHECK_POLICY"; do
+          case "$policy" in
+            warn|fail|ignore) ;;
+            *)
+              echo 'Error: policy inputs accept warn, fail or ignore ❌'
+              exit 1
+              ;;
+          esac
+        done
+
+        echo "Inputs validated ✅"
+
     # Reuse the organisation's Python release calendar rather than
     # carrying a second copy here. The action tolerates a project with no
     # Python metadata, falling back to the currently supported set, which
@@ -183,20 +221,13 @@ runs:
         INPUT_LINKCHECK_POLICY: ${{ inputs.linkcheck_policy }}
         INPUT_REQUIRE_SPHINX_STRICT: ${{ inputs.require_sphinx_strict }}
         INPUT_FAIL_ON_WARNING: ${{ inputs.fail_on_warning }}
+        INPUT_OFFLINE_MODE: ${{ inputs.offline_mode }}
         INPUT_SUMMARY: ${{ inputs.summary }}
         SUPPORTED_VERSIONS: ${{ steps.supported.outputs.supported_versions }}
         ACTION_PATH: ${{ github.action_path }}
       run: |
         # Audit ReadTheDocs configuration
         set -uo pipefail
-
-        for flag in "$INPUT_REQUIRE_SPHINX_STRICT" "$INPUT_FAIL_ON_WARNING" \
-                    "$INPUT_SUMMARY"; do
-          if [ "$flag" != "true" ] && [ "$flag" != "false" ]; then
-            echo 'Error: boolean inputs accept only true or false ❌'
-            exit 1
-          fi
-        done
 
         args=(
           --path-prefix "$INPUT_PATH_PREFIX"

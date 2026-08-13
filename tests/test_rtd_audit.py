@@ -283,6 +283,49 @@ class PathReporting(unittest.TestCase):
         for path in paths:
             self.assertFalse(Path(path).is_absolute(), f"{path} should be relative")
 
+    def test_reports_a_missing_directory(self) -> None:
+        """An invalid path_prefix reports rather than raising."""
+        code, report = audit_path(Path("/nonexistent/project/path"))
+        self.assertEqual(code, 1)
+        self.assertIn("path-missing", codes(report))
+
+
+class Rendering(unittest.TestCase):
+    """The renderers survive awkward finding text."""
+
+    def test_summary_keeps_multiline_messages_on_one_row(self) -> None:
+        """A YAML parse error spans lines; a table row cannot."""
+        sys.path.insert(0, str(REPO_ROOT))
+        from lib.render_summary import finding_rows  # noqa: PLC0415
+
+        report: dict[str, object] = {
+            "findings": [
+                {
+                    "severity": "error",
+                    "code": "config-unparsable",
+                    "message": "Cannot parse as YAML: line 3\n  os: [unclosed\n      ^",
+                }
+            ]
+        }
+        for row in finding_rows(report):
+            self.assertNotIn("\n", row)
+
+    def test_annotation_escapes_property_separators(self) -> None:
+        """A colon or comma in a property would end it early."""
+        sys.path.insert(0, str(REPO_ROOT))
+        from lib.render_annotations import escape_property  # noqa: PLC0415
+
+        escaped = escape_property("a:b,c")
+        self.assertNotIn(":", escaped)
+        self.assertNotIn(",", escaped)
+        self.assertEqual(escaped, "a%3Ab%2Cc")
+
+    def test_annotation_message_escapes_newlines(self) -> None:
+        sys.path.insert(0, str(REPO_ROOT))
+        from lib.render_annotations import escape_data  # noqa: PLC0415
+
+        self.assertEqual(escape_data("one\ntwo"), "one%0Atwo")
+
 
 if __name__ == "__main__":
     _ = unittest.main(verbosity=2)
