@@ -1,53 +1,246 @@
 ---
 # SPDX-License-Identifier: Apache-2.0
-# SPDX-FileCopyrightText: 2025 The Linux Foundation
+# SPDX-FileCopyrightText: 2026 The Linux Foundation
 
-# actions-template
-name: "🛠️ Actions Template"
-description: "Description of action"
-# Any relevant notes/observations can go here
+# rtd-config-audit-action
+name: "📄 Audit ReadTheDocs Configuration"
+description: "Check a repository's ReadTheDocs setup for policy compliance"
+
+# Parses .readthedocs.yaml as YAML rather than by pattern matching, so a
+# key nested under build.tools.python never gets confused with a
+# similarly named key elsewhere in the document.
+#
+# Every policy input defaults to empty or to the permissive setting. With
+# no configuration the action checks what all projects share: that the
+# config parses, declares a build image and a documentation Python
+# version, and that the version still receives upstream support.
 
 inputs:
-  input:
-    description: "Description of input"
-    required: true
+  path_prefix:
+    description: "Directory location containing project code"
+    required: false
+    default: "."
+  config_file:
+    # yamllint disable-line rule:line-length
+    description: "Path to the ReadTheDocs config; empty searches for .readthedocs.yaml then .readthedocs.yml"
+    required: false
+    default: ""
+  tox_file:
+    # yamllint disable-line rule:line-length
+    description: "Path to the tox file holding the docs environment; empty searches docs/tox.ini then tox.ini"
+    required: false
+    default: ""
+  required_files:
+    # yamllint disable-line rule:line-length
+    description: "Newline or comma separated files the project must ship; empty disables the check"
+    required: false
+    default: ""
+  forbidden_files:
+    # yamllint disable-line rule:line-length
+    description: "Newline or comma separated files the project must not ship; empty disables the check"
+    required: false
+    default: ""
+  build_os:
+    # yamllint disable-line rule:line-length
+    description: "Expected build.os value, e.g. ubuntu-24.04; empty accepts whatever the project declares"
+    required: false
+    default: ""
+  python_version:
+    # yamllint disable-line rule:line-length
+    description: "Expected build.tools.python value; empty accepts any version that upstream still supports"
+    required: false
+    default: ""
+  default_python:
+    # yamllint disable-line rule:line-length
+    description: "Documentation Python version to assume when the project declares none"
+    required: false
+    default: "3.13"
+  eol_behaviour:
+    # yamllint disable-line rule:line-length
+    description: "Treatment of an end-of-life Python version: warn, fail or ignore"
+    required: false
+    default: "warn"
+  linkcheck_policy:
+    # yamllint disable-line rule:line-length
+    description: >-
+      Treatment of a linkcheck environment that sets '-W': warn, fail or
+      ignore. External sites increasingly block automated requests, so a
+      strict link check reports somebody else's bot policy as a build
+      failure.
+    required: false
+    default: "warn"
+  require_sphinx_strict:
+    # yamllint disable-line rule:line-length
+    description: "Expect '-W' on documentation builds (does not apply to linkcheck)"
+    required: false
+    default: "false"
+  fail_on_warning:
+    description: "Fail the action when the audit reports warnings"
+    required: false
+    default: "false"
+  offline_mode:
+    # yamllint disable-line rule:line-length
+    description: "Skip the network lookup of supported Python versions"
+    required: false
+    default: "false"
+  summary:
+    description: "Write a report to the workflow step summary"
+    required: false
+    default: "true"
 
 outputs:
-  output:
-    description: "Description of output"
-    value: ${{ steps.code.outputs.output }}
+  passed:
+    description: "Whether the audit completed without a failing finding"
+    value: ${{ steps.audit.outputs.passed }}
+  config_found:
+    description: "Whether the action located a ReadTheDocs config"
+    value: ${{ steps.audit.outputs.config_found }}
+  config_path:
+    description: "Path of the ReadTheDocs config the action inspected"
+    value: ${{ steps.audit.outputs.config_path }}
+  docs_python:
+    # yamllint disable-line rule:line-length
+    description: "Python version the documentation build should use; suitable for setup-python"
+    value: ${{ steps.audit.outputs.docs_python }}
+  tox_python:
+    description: "Python version pinned by the tox docs environment"
+    value: ${{ steps.audit.outputs.tox_python }}
+  rtd_python:
+    description: "Python version declared by build.tools.python"
+    value: ${{ steps.audit.outputs.rtd_python }}
+  python_mismatch:
+    description: "Whether the tox and ReadTheDocs Python versions diverge"
+    value: ${{ steps.audit.outputs.python_mismatch }}
+  python_eol:
+    # yamllint disable-line rule:line-length
+    description: "Whether the documentation Python version has reached end of life"
+    value: ${{ steps.audit.outputs.python_eol }}
+  build_os:
+    description: "The build.os value the project declares"
+    value: ${{ steps.audit.outputs.build_os }}
+  errors:
+    description: "Count of findings at error severity"
+    value: ${{ steps.audit.outputs.errors }}
+  warnings:
+    description: "Count of findings at warning severity"
+    value: ${{ steps.audit.outputs.warnings }}
+  findings_json:
+    description: "Complete audit report as a JSON string"
+    value: ${{ steps.audit.outputs.findings_json }}
 
 runs:
   using: "composite"
   steps:
-    - name: "Friendly Name"
-      id: code
+    # Reuse the organisation's Python release calendar rather than
+    # carrying a second copy here. The action tolerates a project with no
+    # Python metadata, falling back to the currently supported set, which
+    # is exactly what a documentation-only repository needs.
+    - name: "Determine supported Python versions"
+      id: supported
+      if: inputs.offline_mode != 'true'
+      # yamllint disable-line rule:line-length
+      uses: lfreleng-actions/python-supported-versions-action@12018ee751415260147d2ca2f0e990cd1481f3b0  # v0.2.2
+      continue-on-error: true
+      with:
+        path_prefix: ${{ inputs.path_prefix }}
+        eol_behaviour: "warn"
+
+    - name: "Provide PyYAML"
+      id: deps
       shell: bash
-      env:
-        INPUT_VALUE: ${{ inputs.input }}
       run: |
-        # Friendly Name
-        input="$INPUT_VALUE"
-        if [ -z "$input" ]; then
-          echo "Error: mandatory input was not set/configured ❌"
+        # Provide PyYAML
+        set -euo pipefail
+
+        if python3 -c 'import yaml' 2>/dev/null; then
+          echo "PyYAML already present ✅"
+          exit 0
+        fi
+
+        echo "Installing PyYAML..."
+        # --user keeps the install out of a system directory the runner
+        # may protect; --quiet keeps the log readable.
+        if python3 -m pip install --user --quiet pyyaml; then
+          echo "Installed PyYAML ✅"
+        else
+          echo 'Error: could not install PyYAML ❌'
           exit 1
         fi
 
-        # Write the output using the multiline heredoc format with a random
-        # delimiter so that an input containing newlines cannot inject
-        # additional keys into $GITHUB_OUTPUT (output-file injection). The
-        # delimiter is built from shell-builtin randomness (no external
-        # tools such as openssl/uuidgen, which are not guaranteed on
-        # self-hosted runners) and regenerated until it is provably absent
-        # from the value being emitted.
-        delimiter="ghadelim_${RANDOM}${RANDOM}${RANDOM}${RANDOM}"
-        while [[ "$input" == *"$delimiter"* ]]; do
-          delimiter="ghadelim_${RANDOM}${RANDOM}${RANDOM}${RANDOM}"
+    - name: "Audit ReadTheDocs configuration"
+      id: audit
+      shell: bash
+      env:
+        INPUT_PATH_PREFIX: ${{ inputs.path_prefix }}
+        INPUT_CONFIG_FILE: ${{ inputs.config_file }}
+        INPUT_TOX_FILE: ${{ inputs.tox_file }}
+        INPUT_REQUIRED_FILES: ${{ inputs.required_files }}
+        INPUT_FORBIDDEN_FILES: ${{ inputs.forbidden_files }}
+        INPUT_BUILD_OS: ${{ inputs.build_os }}
+        INPUT_PYTHON_VERSION: ${{ inputs.python_version }}
+        INPUT_DEFAULT_PYTHON: ${{ inputs.default_python }}
+        INPUT_EOL_BEHAVIOUR: ${{ inputs.eol_behaviour }}
+        INPUT_LINKCHECK_POLICY: ${{ inputs.linkcheck_policy }}
+        INPUT_REQUIRE_SPHINX_STRICT: ${{ inputs.require_sphinx_strict }}
+        INPUT_FAIL_ON_WARNING: ${{ inputs.fail_on_warning }}
+        INPUT_SUMMARY: ${{ inputs.summary }}
+        SUPPORTED_VERSIONS: ${{ steps.supported.outputs.supported_versions }}
+        ACTION_PATH: ${{ github.action_path }}
+      run: |
+        # Audit ReadTheDocs configuration
+        set -uo pipefail
+
+        for flag in "$INPUT_REQUIRE_SPHINX_STRICT" "$INPUT_FAIL_ON_WARNING" \
+                    "$INPUT_SUMMARY"; do
+          if [ "$flag" != "true" ] && [ "$flag" != "false" ]; then
+            echo 'Error: boolean inputs accept only true or false ❌'
+            exit 1
+          fi
         done
-        {
-          printf '%s<<%s\n' 'output' "$delimiter"
-          printf '%s\n' "$input"
-          printf '%s\n' "$delimiter"
-        } >> "$GITHUB_OUTPUT"
-        echo "Action received: $input ✅"
-        echo "Action received: $input ✅" >> "$GITHUB_STEP_SUMMARY"
+
+        args=(
+          --path-prefix "$INPUT_PATH_PREFIX"
+          --config-file "$INPUT_CONFIG_FILE"
+          --tox-file "$INPUT_TOX_FILE"
+          --required-files "$INPUT_REQUIRED_FILES"
+          --forbidden-files "$INPUT_FORBIDDEN_FILES"
+          --build-os "$INPUT_BUILD_OS"
+          --python-version "$INPUT_PYTHON_VERSION"
+          --default-python "$INPUT_DEFAULT_PYTHON"
+          --eol-behaviour "$INPUT_EOL_BEHAVIOUR"
+          --linkcheck-policy "$INPUT_LINKCHECK_POLICY"
+          --supported-versions "${SUPPORTED_VERSIONS:-}"
+        )
+        if [ "$INPUT_REQUIRE_SPHINX_STRICT" = "true" ]; then
+          args+=(--require-sphinx-strict)
+        fi
+        if [ "$INPUT_FAIL_ON_WARNING" = "true" ]; then
+          args+=(--fail-on-warning)
+        fi
+
+        report="$(PYTHONPATH="${ACTION_PATH}" \
+          python3 -m lib.rtd_audit "${args[@]}")"
+        status=$?
+
+        # Surface the report in the job log whatever the outcome.
+        printf '%s\n' "$report"
+
+        # Publish the outputs. The helper emits scalar assignments plus a
+        # heredoc block for the full report, so a value containing
+        # newlines cannot inject further keys.
+        printf '%s' "$report" \
+          | PYTHONPATH="${ACTION_PATH}" python3 -m lib.emit_outputs \
+          >> "$GITHUB_OUTPUT"
+
+        if [ "$INPUT_SUMMARY" = "true" ]; then
+          printf '%s' "$report" \
+            | PYTHONPATH="${ACTION_PATH}" python3 -m lib.render_summary \
+            >> "$GITHUB_STEP_SUMMARY"
+        fi
+
+        # Repeat findings as workflow annotations so they appear against
+        # the run rather than only inside the log.
+        printf '%s' "$report" \
+          | PYTHONPATH="${ACTION_PATH}" python3 -m lib.render_annotations
+
+        exit "$status"

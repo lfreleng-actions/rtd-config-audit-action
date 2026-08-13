@@ -65,6 +65,9 @@ repos:
     rev: 41e691678310dfd3833f7ab4e180ddb014310356  # frozen: v2.3.0
     hooks:
       - id: mypy
+        # The audit parses YAML; without the stubs mypy cannot resolve
+        # the import and reports it on every run.
+        additional_dependencies: ["types-PyYAML"]
 
   - repo: https://github.com/btford/write-good
     rev: ab66ce10136dfad5146e69e70f82a3efac8842c1  # frozen: v1.0.8
@@ -106,6 +109,11 @@ repos:
     rev: d55eabd2531b4f4a4c49c30fba627ce3a636ab79  # frozen: 1.39.9
     hooks:
       - id: basedpyright
+        # basedpyright bundles the PyYAML stubs but reports
+        # 'reportMissingModuleSource' when the package itself is absent
+        # from the hook environment. Installing it keeps the result the
+        # same whether or not the host happens to provide PyYAML.
+        additional_dependencies: ["pyyaml"]
 
   - repo: https://github.com/lfreleng-actions/gha-workflow-linter
     rev: 087342b0da33b43edfe4a0b31747b336334003b4  # frozen: v1.3.0
