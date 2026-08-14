@@ -94,6 +94,11 @@ steps:
 Both `required_files` and `forbidden_files` accept newline or comma
 separated entries.
 
+`config_file` and `tox_file` name a single file each, overriding the
+search. A relative value resolves against `path_prefix` rather than the
+working directory, so `docs/tox.ini` means that file inside the project
+under audit. An absolute value stands on its own.
+
 ## Outputs
 
 <!-- markdownlint-disable MD013 -->
@@ -102,9 +107,9 @@ separated entries.
 | ----------------- | ---------------------------------------------------------------- |
 | `passed`          | Whether the audit completed without a failing finding            |
 | `config_found`    | Whether the action located a ReadTheDocs config                  |
-| `config_path`     | Path of the config the action inspected                          |
-| `tox_path`        | Path of the tox file the action inspected                        |
-| `tox_dir`         | Directory holding the tox file, for running tox from             |
+| `config_path`     | Path of the config inspected; empty when it found none           |
+| `tox_path`        | Path of the tox file inspected; empty when it found none         |
+| `tox_dir`         | Directory holding the tox file; empty when it found none         |
 | `docs_python`     | Python version the documentation build should use                |
 | `tox_python`      | Version pinned by the tox docs environment                       |
 | `rtd_python`      | Version declared by `build.tools.python`                         |

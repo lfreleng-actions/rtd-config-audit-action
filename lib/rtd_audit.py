@@ -43,6 +43,7 @@ from lib.rtd_model import (
     Audit,
     find_first,
     relative_to,
+    resolve_under,
     split_list,
 )
 
@@ -228,14 +229,19 @@ def audit_config(
 
 def audit_tox(root: Path, settings: Settings, resolved: Resolved, audit: Audit) -> None:
     """Run every check that reads the tox file, when one exists."""
-    tox_path = (
-        Path(settings.tox_file) if settings.tox_file else find_first(root, TOX_NAMES)
-    )
+    tox_path: Path | None
+    if settings.tox_file:
+        tox_path = resolve_under(root, settings.tox_file)
+        looked_for = settings.tox_file
+    else:
+        tox_path = find_first(root, TOX_NAMES)
+        looked_for = ", ".join(TOX_NAMES)
+
     if tox_path is None or not tox_path.is_file():
         audit.add(
             SEVERITY_NOTICE,
             "tox-absent",
-            f"No tox file found (looked for {', '.join(TOX_NAMES)}); skipped tox checks",
+            f"No tox file found (looked for {looked_for}); skipped tox checks",
         )
         return
 
@@ -265,16 +271,19 @@ def run_audit(settings: Settings) -> Report:
         )
         return Report(resolved, audit, settings)
 
-    config_path = (
-        Path(settings.config_file)
-        if settings.config_file
-        else find_first(root, CONFIG_NAMES)
-    )
+    config_path: Path | None
+    if settings.config_file:
+        config_path = resolve_under(root, settings.config_file)
+        looked_for = settings.config_file
+    else:
+        config_path = find_first(root, CONFIG_NAMES)
+        looked_for = ", ".join(CONFIG_NAMES)
+
     if config_path is None or not config_path.is_file():
         audit.add(
             SEVERITY_ERROR,
             "config-missing",
-            f"No Read the Docs configuration found (looked for {', '.join(CONFIG_NAMES)})",
+            f"No Read the Docs configuration found (looked for {looked_for})",
         )
         return Report(resolved, audit, settings)
 
