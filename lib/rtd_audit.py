@@ -72,6 +72,8 @@ class Resolved:
 
     config_found: bool = False
     config_path: str = ""
+    tox_path: str = ""
+    tox_dir: str = ""
     build_os: str = ""
     rtd_python: str = ""
     tox_python: str = ""
@@ -84,6 +86,8 @@ class Resolved:
         return {
             "config_found": self.config_found,
             "config_path": self.config_path,
+            "tox_path": self.tox_path,
+            "tox_dir": self.tox_dir,
             "build_os": self.build_os,
             "rtd_python": self.rtd_python,
             "tox_python": self.tox_python,
@@ -235,6 +239,14 @@ def audit_tox(root: Path, settings: Settings, resolved: Resolved, audit: Audit) 
         )
         return
 
+    # Report where the tox file lives so a caller running the same
+    # documentation build need not repeat this search, and cannot
+    # disagree with it.
+    resolved.tox_path = relative_to(tox_path, root)
+    # tox runs from the directory holding its configuration, and a
+    # caller cannot take a dirname inside a workflow expression.
+    parent = str(Path(resolved.tox_path).parent)
+    resolved.tox_dir = "." if parent == "." else parent
     resolved.tox_python = read_tox_docs_python(tox_path, root, audit)
     check_sphinx_flags(
         tox_path, root, settings.require_sphinx_strict, settings.linkcheck_policy, audit

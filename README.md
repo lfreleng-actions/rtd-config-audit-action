@@ -103,6 +103,8 @@ separated entries.
 | `passed`          | Whether the audit completed without a failing finding            |
 | `config_found`    | Whether the action located a ReadTheDocs config                  |
 | `config_path`     | Path of the config the action inspected                          |
+| `tox_path`        | Path of the tox file the action inspected                        |
+| `tox_dir`         | Directory holding the tox file, for running tox from             |
 | `docs_python`     | Python version the documentation build should use                |
 | `tox_python`      | Version pinned by the tox docs environment                       |
 | `rtd_python`      | Version declared by `build.tools.python`                         |
