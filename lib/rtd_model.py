@@ -123,3 +123,15 @@ def relative_to(path: Path, root: Path) -> str:
         return str(path.resolve().relative_to(root))
     except ValueError:
         return str(path)
+
+
+def resolve_under(root: Path, value: str) -> Path:
+    """Resolve a caller-supplied path against the project root.
+
+    An absolute path stands on its own. A relative path joins the
+    project root rather than the working directory, so a caller naming
+    ``docs/tox.ini`` means the file inside the project it pointed at,
+    whatever directory the action happens to run from.
+    """
+    candidate = Path(value)
+    return candidate if candidate.is_absolute() else root / candidate

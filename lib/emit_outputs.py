@@ -20,6 +20,8 @@ SCALAR_KEYS = (
     "passed",
     "config_found",
     "config_path",
+    "tox_path",
+    "tox_dir",
     "docs_python",
     "tox_python",
     "rtd_python",

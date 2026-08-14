@@ -82,6 +82,7 @@ class GoodProject(unittest.TestCase):
         _, report = run_audit("good")
         self.assertTrue(report["config_found"])
         self.assertEqual(report["config_path"], ".readthedocs.yaml")
+        self.assertEqual(report["tox_path"], "docs/tox.ini")
         self.assertEqual(report["build_os"], "ubuntu-24.04")
         self.assertEqual(report["rtd_python"], "3.13")
         self.assertEqual(report["tox_python"], "3.13")
@@ -288,6 +289,140 @@ class PathReporting(unittest.TestCase):
         code, report = audit_path(Path("/nonexistent/project/path"))
         self.assertEqual(code, 1)
         self.assertIn("path-missing", codes(report))
+
+
+class ToxDiscovery(unittest.TestCase):
+    """The audit reports which tox file it inspected.
+
+    A caller running the same documentation build reads this rather than
+    repeating the search, so the two cannot disagree about which file
+    holds the documentation environments.
+    """
+
+    def test_reports_a_docs_tox_file(self) -> None:
+        _, report = run_audit("good")
+        self.assertEqual(report["tox_path"], "docs/tox.ini")
+        self.assertEqual(report["tox_dir"], "docs")
+
+    def test_finds_a_root_tox_file(self) -> None:
+        """A project may keep its documentation environments at the root."""
+        with tempfile.TemporaryDirectory() as tmp:
+            project = Path(tmp)
+            _ = (project / ".readthedocs.yaml").write_text(
+                'version: 2\nbuild:\n  os: ubuntu-24.04\n  tools:\n    python: "3.13"\n',
+                encoding="utf-8",
+            )
+            _ = (project / "tox.ini").write_text(
+                "[testenv:docs]\nbasepython = python3.13\ncommands =\n"
+                + "    sphinx-build -W -b html . _build/html\n",
+                encoding="utf-8",
+            )
+            _, report = audit_path(project)
+        self.assertEqual(report["tox_path"], "tox.ini")
+        # A root tox file runs from the project root, not from '' .
+        self.assertEqual(report["tox_dir"], ".")
+        self.assertEqual(report["docs_python"], "3.13")
+
+    def test_prefers_the_docs_directory(self) -> None:
+        """Where both exist, the documentation copy wins."""
+        with tempfile.TemporaryDirectory() as tmp:
+            project = Path(tmp)
+            _ = (project / ".readthedocs.yaml").write_text(
+                'version: 2\nbuild:\n  os: ubuntu-24.04\n  tools:\n    python: "3.13"\n',
+                encoding="utf-8",
+            )
+            _ = (project / "tox.ini").write_text("[testenv]\n", encoding="utf-8")
+            (project / "docs").mkdir()
+            _ = (project / "docs" / "tox.ini").write_text(
+                "[testenv:docs]\nbasepython = python3.13\ncommands =\n"
+                + "    sphinx-build -W -b html . _build/html\n",
+                encoding="utf-8",
+            )
+            _, report = audit_path(project)
+        self.assertEqual(report["tox_path"], "docs/tox.ini")
+
+    def test_reports_nothing_when_absent(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            project = Path(tmp)
+            _ = (project / ".readthedocs.yaml").write_text(
+                'version: 2\nbuild:\n  os: ubuntu-24.04\n  tools:\n    python: "3.13"\n',
+                encoding="utf-8",
+            )
+            _, report = audit_path(project)
+        self.assertEqual(report["tox_path"], "")
+        self.assertEqual(report["tox_dir"], "")
+        self.assertIn("tox-absent", codes(report))
+
+
+class PathOverrides(unittest.TestCase):
+    """A named file resolves against the project, not the caller's cwd.
+
+    The action runs from the workspace root while auditing a project
+    that may sit deeper, so resolving a relative override against the
+    working directory would read the wrong file or none at all.
+    """
+
+    def _project(self, tmp: str) -> Path:
+        project = Path(tmp) / "project"
+        (project / "docs").mkdir(parents=True)
+        _ = (project / ".readthedocs.yaml").write_text(
+            'version: 2\nbuild:\n  os: ubuntu-24.04\n  tools:\n    python: "3.13"\n',
+            encoding="utf-8",
+        )
+        _ = (project / "docs" / "tox.ini").write_text(
+            "[testenv:docs]\nbasepython = python3.13\ncommands =\n"
+            + "    sphinx-build -W -b html . _build/html\n",
+            encoding="utf-8",
+        )
+        return project
+
+    def test_relative_overrides_resolve_against_the_project(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            project = self._project(tmp)
+            code, report = audit_path(
+                project,
+                "--config-file",
+                ".readthedocs.yaml",
+                "--tox-file",
+                "docs/tox.ini",
+            )
+        self.assertEqual(code, 0)
+        self.assertEqual(report["config_path"], ".readthedocs.yaml")
+        self.assertEqual(report["tox_path"], "docs/tox.ini")
+        self.assertEqual(report["docs_python"], "3.13")
+
+    def test_absolute_overrides_stand_alone(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            project = self._project(tmp)
+            code, report = audit_path(
+                project,
+                "--tox-file",
+                str(project / "docs" / "tox.ini"),
+            )
+        self.assertEqual(code, 0)
+        self.assertEqual(report["tox_path"], "docs/tox.ini")
+
+    def test_a_named_tox_file_reports_itself_when_absent(self) -> None:
+        """The message names the file asked for, not the default search."""
+        with tempfile.TemporaryDirectory() as tmp:
+            project = self._project(tmp)
+            _, report = audit_path(project, "--tox-file", "docs/missing.ini")
+        messages = [
+            f["message"] for f in findings_of(report) if f["code"] == "tox-absent"
+        ]
+        self.assertEqual(len(messages), 1)
+        self.assertIn("docs/missing.ini", str(messages[0]))
+        self.assertNotIn("tox.ini,", str(messages[0]))
+
+    def test_a_named_config_reports_itself_when_absent(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            project = self._project(tmp)
+            code, report = audit_path(project, "--config-file", "nope.yaml")
+        self.assertEqual(code, 1)
+        messages = [
+            f["message"] for f in findings_of(report) if f["code"] == "config-missing"
+        ]
+        self.assertIn("nope.yaml", str(messages[0]))
 
 
 class Rendering(unittest.TestCase):

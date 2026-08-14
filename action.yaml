@@ -98,6 +98,14 @@ outputs:
   config_path:
     description: "Path of the ReadTheDocs config the action inspected"
     value: ${{ steps.audit.outputs.config_path }}
+  tox_path:
+    # yamllint disable-line rule:line-length
+    description: "Path of the tox file the action inspected; empty when it found none"
+    value: ${{ steps.audit.outputs.tox_path }}
+  tox_dir:
+    # yamllint disable-line rule:line-length
+    description: "Directory holding the tox file, suitable for running tox from"
+    value: ${{ steps.audit.outputs.tox_dir }}
   docs_python:
     # yamllint disable-line rule:line-length
     description: "Python version the documentation build should use; suitable for setup-python"
