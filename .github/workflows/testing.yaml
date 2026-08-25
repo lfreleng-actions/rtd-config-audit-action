@@ -32,7 +32,7 @@ jobs:
       # .github repository and publish it as $CONNECTION_ALLOW_LIST for
       # the harden-runner step below.
       # yamllint disable-line rule:line-length
-      - uses: lfreleng-actions/harden-runner-block-action@6db537b3e6d060c3287c5a3ce2c28b55b0af330d  # v0.2.1
+      - uses: lfreleng-actions/harden-runner-block-action@d86087ddc1c2d27182a886ec788d39b88201c8ed  # v0.3.0
         with:
           config: '@d43a857514f81ce2af4230aca16e179ef96148d8'  # v0.13.0
 
@@ -72,7 +72,7 @@ jobs:
     timeout-minutes: 10
     steps:
       # yamllint disable-line rule:line-length
-      - uses: lfreleng-actions/harden-runner-block-action@6db537b3e6d060c3287c5a3ce2c28b55b0af330d  # v0.2.1
+      - uses: lfreleng-actions/harden-runner-block-action@d86087ddc1c2d27182a886ec788d39b88201c8ed  # v0.3.0
         with:
           config: '@d43a857514f81ce2af4230aca16e179ef96148d8'  # v0.13.0
 
