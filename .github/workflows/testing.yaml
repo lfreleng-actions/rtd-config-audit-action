@@ -54,8 +54,14 @@ jobs:
         shell: bash
         run: |
           # Run unit tests
-          python3 -m pip install --user --quiet pyyaml
-          python3 -m unittest discover -s tests -p "test_*.py" -v
+          # Install into a dedicated environment so pip downloads and
+          # hash-checks PyYAML. Installing into the runner's Python
+          # would let pip skip the download, and the check with it,
+          # whenever the image already ships a matching version.
+          python3 -m venv .venv
+          .venv/bin/python -m pip install --require-hashes --quiet \
+            -r tests/requirements.txt
+          .venv/bin/python -m unittest discover -s tests -p "test_*.py" -v
 
   ### Test the GitHub Action in this Repository ###
   tests:
