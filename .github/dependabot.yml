@@ -16,3 +16,19 @@ updates:
     cooldown:
       default-days: 7
     open-pull-requests-limit: 15
+
+  # The unit test job installs PyYAML from tests/requirements.txt with
+  # --require-hashes, so the pin only moves when someone edits that
+  # file. Dependabot rewrites the hash block from the PyPI release
+  # listing, which covers every artefact of the release rather than the
+  # one wheel a single platform resolves to, so the cross-platform pin
+  # survives a bump.
+  - package-ecosystem: "pip"
+    directory: "/tests"
+    schedule:
+      interval: "weekly"
+    commit-message:
+      prefix: "CI(deps)"
+    cooldown:
+      default-days: 7
+    open-pull-requests-limit: 5

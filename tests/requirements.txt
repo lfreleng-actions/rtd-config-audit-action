@@ -5,8 +5,12 @@
 # release is listed, not just the wheel one runner happens to select,
 # so the pin holds if the image changes its Python or architecture.
 #
-# Regenerate after a version bump. The awk step keeps this header by
-# copying lines up to the first requirement, so the file stays REUSE
+# Dependabot bumps this file (pip ecosystem, /tests) and rewrites the
+# hash block itself, so a version bump normally arrives as a pull
+# request rather than hand-editing.
+#
+# To regenerate by hand, the awk step keeps this header by copying
+# lines up to the first requirement, so the file stays REUSE
 # compliant:
 #
 #   awk "/^[^#]/{exit} {print}" tests/requirements.txt > /tmp/req.txt
