@@ -185,7 +185,7 @@ runs:
       id: supported
       if: inputs.offline_mode != 'true'
       # yamllint disable-line rule:line-length
-      uses: lfreleng-actions/python-supported-versions-action@12018ee751415260147d2ca2f0e990cd1481f3b0  # v0.2.2
+      uses: lfreleng-actions/python-supported-versions-action@109a0d1865cb4f42feeb76fcd24e74a7186950e2  # v0.2.3
       continue-on-error: true
       with:
         path_prefix: ${{ inputs.path_prefix }}
