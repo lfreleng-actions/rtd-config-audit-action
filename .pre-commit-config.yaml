@@ -7,7 +7,28 @@ ci:
   # pre-commit.ci sandbox prevents network calls; disable gha-workflow-linter.
   # aislop also runs engines that can call the network at scan time
   # (dependency audits), so it cannot run in the sandbox either.
-  skip: [gha-workflow-linter, aislop]
+  #
+  # basedpyright is skipped for a different reason: size. pre-commit.ci
+  # caps a hook environment at 250MiB, and this one reaches 251.6MiB
+  # once PyYAML joins the bundled type stubs. The build stage fails on
+  # that, so no hook runs at all and the whole check reports red:
+  #
+  #   build of .../basedpyright-prek-mirror:pyyaml for [email protected]
+  #   exceeds tier max size 250MiB: 251.6MiB
+  #
+  # Dropping PyYAML does fit, at 248.7MiB, and a pyrightconfig.json
+  # setting reportMissingModuleSource to none keeps the run clean
+  # without it. Rejected: 1.3MiB of headroom, against a dependency
+  # that grows every release, puts a required check back on the
+  # critical path the first time it creeps over.
+  #
+  # The cap applies to pre-commit.ci alone, so the hook is untouched
+  # and a local 'prek run' still exercises it. That is the extent of
+  # it: nothing here installs the hooks or asks a contributor to, and
+  # no workflow runs pre-commit, so pre-commit.ci was the only place
+  # basedpyright ran without being asked. Skipping it makes type
+  # checking opt-in until a workflow picks it up.
+  skip: [gha-workflow-linter, aislop, basedpyright]
   autofix_commit_msg: |
     Chore: pre-commit autofixes
 
