@@ -94,7 +94,7 @@ jobs:
       # version for a downstream setup-python step.
       - name: "Audit a compliant project"
         id: good
-        uses: ./
+        uses: $/
         with:
           path_prefix: "tests/fixtures/good"
 
@@ -132,7 +132,7 @@ jobs:
       # A mismatch between tox and ReadTheDocs warns without failing.
       - name: "Audit a project with divergent Python versions"
         id: mismatch
-        uses: ./
+        uses: $/
         with:
           path_prefix: "tests/fixtures/mismatch"
 
@@ -160,7 +160,7 @@ jobs:
       # Failure testing is also important: retired keys must fail.
       - name: "Audit a legacy project [expected failure]"
         id: legacy
-        uses: ./
+        uses: $/
         continue-on-error: true
         with:
           path_prefix: "tests/fixtures/legacy"
@@ -182,7 +182,7 @@ jobs:
 
       - name: "Audit a project with no config [expected failure]"
         id: missing
-        uses: ./
+        uses: $/
         continue-on-error: true
         with:
           path_prefix: "${{ runner.temp }}/no-rtd-config"
@@ -198,7 +198,7 @@ jobs:
       # An invalid boolean input must fail.
       - name: "Reject an invalid boolean [expected failure]"
         id: badinput
-        uses: ./
+        uses: $/
         continue-on-error: true
         with:
           path_prefix: "tests/fixtures/good"
