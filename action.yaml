@@ -194,6 +194,8 @@ runs:
     - name: "Provide PyYAML"
       id: deps
       shell: bash
+      env:
+        ACTION_PATH: ${{ github.action_path }}
       run: |
         # Provide PyYAML
         set -euo pipefail
@@ -204,9 +206,12 @@ runs:
         fi
 
         echo "Installing PyYAML..."
+        # Install the version the unit tests run against, hash-checked,
+        # so the caller's job never runs whatever PyPI serves on the day.
         # --user keeps the install out of a system directory the runner
         # may protect; --quiet keeps the log readable.
-        if python3 -m pip install --user --quiet pyyaml; then
+        if python3 -m pip install --user --quiet --require-hashes \
+            -r "$ACTION_PATH/requirements.txt"; then
           echo "Installed PyYAML ✅"
         else
           echo 'Error: could not install PyYAML ❌'
