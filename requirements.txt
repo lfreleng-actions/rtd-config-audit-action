@@ -1,22 +1,30 @@
 # SPDX-License-Identifier: Apache-2.0
 # SPDX-FileCopyrightText: 2026 The Linux Foundation
 
-# Hash-pinned dependencies for the unit test job. Every artefact of the
-# release is listed, not just the wheel one runner happens to select,
-# so the pin holds if the image changes its Python or architecture.
+# Hash-pinned runtime dependencies of the action. The "Provide PyYAML"
+# step installs this file with --require-hashes when the runner's
+# python3 lacks PyYAML, and the unit test job installs the same file,
+# so the tests exercise exactly the version the action runs with.
 #
-# Dependabot bumps this file (pip ecosystem, /tests) and rewrites the
-# hash block itself, so a version bump normally arrives as a pull
-# request rather than hand-editing.
+# Keep this file to what the action needs at runtime: every caller
+# whose Python lacks PyYAML installs all of it.
+#
+# Every artefact of the release is listed, not just the wheel one
+# runner happens to select, so the pin holds whatever Python version,
+# operating system or architecture the caller's runner uses.
+#
+# Dependabot bumps this file (pip ecosystem, /) and rewrites the hash
+# block itself, so a version bump normally arrives as a pull request
+# rather than hand-editing.
 #
 # To regenerate by hand, the awk step keeps this header by copying
 # lines up to the first requirement, so the file stays REUSE
 # compliant:
 #
-#   awk "/^[^#]/{exit} {print}" tests/requirements.txt > /tmp/req.txt
+#   awk "/^[^#]/{exit} {print}" requirements.txt > /tmp/req.txt
 #   echo pyyaml | uv pip compile - --generate-hashes --no-header \
 #     --no-annotate >> /tmp/req.txt
-#   mv /tmp/req.txt tests/requirements.txt
+#   mv /tmp/req.txt requirements.txt
 
 pyyaml==6.0.3 \
     --hash=sha256:00c4bdeba853cc34e7dd471f16b4114f4162dc03e6b7afcc2128711f0eca823c \
