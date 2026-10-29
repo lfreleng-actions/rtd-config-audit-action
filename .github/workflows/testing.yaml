@@ -138,6 +138,124 @@ jobs:
           fi
           exit "$fail"
 
+  ### Test that modules in the caller's workspace are never imported ###
+  workspace-modules:
+    name: "Ignore modules in the workspace"
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    timeout-minutes: 10
+    steps:
+      # yamllint disable-line rule:line-length
+      - uses: lfreleng-actions/harden-runner-block-action@51ef68401547a8b648275129b9a21544612596d5  # v0.13.1
+        with:
+          config: '@d43a857514f81ce2af4230aca16e179ef96148d8'  # v0.13.0
+
+      - name: "Harden runner (block)"
+        # yamllint disable-line rule:line-length
+        uses: step-security/harden-runner@ccd8616d44fd3846e67624a50d5aad6d37bf2d25  # v2.22.1
+        with:
+          egress-policy: 'block'
+          allowed-endpoints: >
+            ${{ env.CONNECTION_ALLOW_LIST }}
+
+      # Check out below the workspace root, which this repository's own
+      # lib/ would otherwise occupy, leaving the root free for the
+      # modules planted next.
+      - name: "Checkout repository"
+        # yamllint disable-line rule:line-length
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          persist-credentials: false
+          path: source
+
+      # A Python without PyYAML, so the action runs its pip install too.
+      - name: "Set up a Python without PyYAML"
+        # yamllint disable-line rule:line-length
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97  # v7.0.0
+        with:
+          python-version: "3.13"
+
+      # Each planted module records its name in a marker file and exits
+      # non-zero, so importing any of them in place of the real module
+      # shows up in the marker and breaks the audit.
+      - name: "Plant modules in the workspace"
+        shell: bash
+        run: |
+          # Plant modules in the workspace
+          set -euo pipefail
+          body='import os
+          marker = os.path.join(os.environ["RUNNER_TEMP"], "planted-ran")
+          with open(marker, "a") as f:
+              f.write(__name__ + "\n")
+          raise SystemExit(97)
+          '
+          modules=(yaml json argparse configparser secrets sitecustomize)
+          for module in "${modules[@]}"; do
+            printf '%s\n' "$body" > "$module.py"
+          done
+          for package in lib pip; do
+            mkdir -p "$package"
+            printf '%s\n' "$body" > "$package/__init__.py"
+          done
+          echo "Planted modules in $PWD ✅"
+
+      # offline_mode skips python-supported-versions-action, so only
+      # this action's own Python runs while the planted modules exist.
+      - name: "Audit a compliant project"
+        id: planted
+        uses: $/
+        continue-on-error: true
+        with:
+          path_prefix: "source/tests/fixtures/good"
+          offline_mode: "true"
+
+      - name: "Validate the result"
+        shell: bash
+        env:
+          OUTCOME: ${{ steps.planted.outcome }}
+          PASSED: ${{ steps.planted.outputs.passed }}
+          CONFIG_PATH: ${{ steps.planted.outputs.config_path }}
+          DOCS_PYTHON: ${{ steps.planted.outputs.docs_python }}
+          BUILD_OS: ${{ steps.planted.outputs.build_os }}
+          ERRORS: ${{ steps.planted.outputs.errors }}
+        run: |
+          # Validate the result
+          fail=0
+          if [ -e "$RUNNER_TEMP/planted-ran" ]; then
+            echo "Error: the action imported planted modules ❌"
+            cat "$RUNNER_TEMP/planted-ran"
+            fail=1
+          fi
+          if [ "$OUTCOME" != "success" ]; then
+            echo "Expected the audit to succeed, received $OUTCOME ❌"
+            fail=1
+          fi
+          if [ "$PASSED" != "true" ]; then
+            echo "Expected passed=true, received $PASSED ❌"
+            fail=1
+          fi
+          if [ "$CONFIG_PATH" != ".readthedocs.yaml" ]; then
+            echo "Expected .readthedocs.yaml, received $CONFIG_PATH ❌"
+            fail=1
+          fi
+          if [ "$DOCS_PYTHON" != "3.13" ]; then
+            echo "Expected docs_python=3.13, received $DOCS_PYTHON ❌"
+            fail=1
+          fi
+          if [ "$BUILD_OS" != "ubuntu-24.04" ]; then
+            echo "Expected build_os=ubuntu-24.04, received $BUILD_OS ❌"
+            fail=1
+          fi
+          if [ "$ERRORS" != "0" ]; then
+            echo "Expected no errors, received $ERRORS ❌"
+            fail=1
+          fi
+          if [ "$fail" = "0" ]; then
+            echo "No planted module was imported ✅"
+          fi
+          exit "$fail"
+
   ### Test the GitHub Action in this Repository ###
   tests:
     name: "Test local GitHub Action"
