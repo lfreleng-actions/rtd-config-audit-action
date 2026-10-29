@@ -28,6 +28,11 @@ SCALAR_KEYS = (
     "python_mismatch",
     "python_eol",
     "build_os",
+    "runner",
+    "runner_os",
+    "apt_packages",
+    "build_jobs",
+    "build_commands",
     "errors",
     "warnings",
 )

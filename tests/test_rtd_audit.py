@@ -41,6 +41,10 @@ def audit_path(project: Path, *extra: str) -> tuple[int, Report]:
             str(project),
             "--supported-versions",
             SUPPORTED,
+            # Keep the host's OS out of the report; the parity tests
+            # choose one explicitly.
+            "--os-release",
+            str(FIXTURES / "absent-os-release"),
             *extra,
         ],
         capture_output=True,

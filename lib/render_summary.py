@@ -43,6 +43,42 @@ def property_rows(report: dict[str, object]) -> list[str]:
     ]
 
 
+def cell(value: str) -> str:
+    """Quote each space-separated value as code for a table cell."""
+    return " ".join(f"`{part}`" for part in value.split()).replace("|", "\\|")
+
+
+def match_icon(left: str, right: str) -> str:
+    """Mark a pair of values as matching only when both are known."""
+    return "✅" if left and left == right else "⚠️"
+
+
+def parity_rows(report: dict[str, object]) -> list[str]:
+    """Build the runner parity table, setting the two builds side by side."""
+    build_os = text_of(report, "build_os")
+    runner_os = text_of(report, "runner_os")
+    rtd_python = text_of(report, "rtd_python")
+    docs_python = text_of(report, "docs_python")
+    rows = [
+        "#### Runner parity",
+        "",
+        "| Aspect | Read the Docs | This runner | Match |",
+        "| ------ | ------------- | ----------- | ----- |",
+        f"| OS | {cell(build_os) or 'not declared'} | {cell(runner_os) or 'unknown'} "
+        + f"| {match_icon(build_os, runner_os)} |",
+        f"| Python | {cell(rtd_python) or 'not declared'} | {cell(docs_python) or 'unknown'} "
+        + f"| {match_icon(rtd_python, docs_python)} |",
+    ]
+    packages = text_of(report, "apt_packages")
+    if packages:
+        rows.append(f"| APT packages | {cell(packages)} | not installed by tox | ⚠️ |")
+    jobs = text_of(report, "build_jobs")
+    if jobs:
+        rows.append(f"| Build jobs | {cell(jobs)} | not run by tox | ⚠️ |")
+    rows.append("")
+    return rows
+
+
 def flatten(text: str) -> str:
     """Collapse a message onto one line.
 
@@ -83,6 +119,7 @@ def render(report: dict[str, object]) -> str:
         "",
     ]
     lines += property_rows(report)
+    lines += parity_rows(report)
     lines += finding_rows(report)
     return "\n".join(lines)
 

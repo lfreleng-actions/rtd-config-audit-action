@@ -297,6 +297,7 @@ jobs:
           PASSED: ${{ steps.good.outputs.passed }}
           DOCS_PYTHON: ${{ steps.good.outputs.docs_python }}
           BUILD_OS: ${{ steps.good.outputs.build_os }}
+          RUNNER: ${{ steps.good.outputs.runner }}
           ERRORS: ${{ steps.good.outputs.errors }}
         run: |
           # Validate the compliant result
@@ -311,6 +312,10 @@ jobs:
           fi
           if [ "$BUILD_OS" != "ubuntu-24.04" ]; then
             echo "Expected build_os=ubuntu-24.04, received $BUILD_OS ❌"
+            fail=1
+          fi
+          if [ "$RUNNER" != "ubuntu-24.04" ]; then
+            echo "Expected runner=ubuntu-24.04, received $RUNNER ❌"
             fail=1
           fi
           if [ "$ERRORS" != "0" ]; then

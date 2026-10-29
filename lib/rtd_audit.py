@@ -18,7 +18,7 @@ from __future__ import annotations
 
 import argparse
 import json
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import cast
 
@@ -36,6 +36,7 @@ from lib.rtd_checks import (
 )
 from lib.rtd_model import (
     CONFIG_NAMES,
+    OS_RELEASE,
     SEVERITY_ERROR,
     SEVERITY_NOTICE,
     SEVERITY_WARNING,
@@ -46,6 +47,7 @@ from lib.rtd_model import (
     resolve_under,
     split_list,
 )
+from lib.rtd_parity import check_parity, read_runner_os
 
 
 @dataclass(frozen=True)
@@ -65,6 +67,7 @@ class Settings:
     linkcheck_policy: str = "warn"
     require_sphinx_strict: bool = False
     fail_on_warning: bool = False
+    os_release: str = OS_RELEASE
 
 
 @dataclass
@@ -81,6 +84,11 @@ class Resolved:
     docs_python: str = ""
     python_mismatch: bool = False
     python_eol: bool = False
+    runner: str = ""
+    runner_os: str = ""
+    apt_packages: list[str] = field(default_factory=list)
+    build_jobs: list[str] = field(default_factory=list)
+    build_commands: bool = False
 
     def as_dict(self) -> dict[str, object]:
         """Render the resolved values for JSON output."""
@@ -95,6 +103,11 @@ class Resolved:
             "docs_python": self.docs_python,
             "python_mismatch": self.python_mismatch,
             "python_eol": self.python_eol,
+            "runner": self.runner,
+            "runner_os": self.runner_os,
+            "apt_packages": " ".join(self.apt_packages),
+            "build_jobs": " ".join(self.build_jobs),
+            "build_commands": self.build_commands,
         }
 
 
@@ -180,6 +193,9 @@ def build_parser() -> argparse.ArgumentParser:
     _ = parser.add_argument(
         "--fail-on-warning", action="store_true", help="Treat warnings as failures"
     )
+    _ = parser.add_argument(
+        "--os-release", default=OS_RELEASE, help="os-release file naming the runner OS"
+    )
     return parser
 
 
@@ -205,6 +221,7 @@ def settings_from(namespace: argparse.Namespace) -> Settings:
         linkcheck_policy=text("linkcheck_policy"),
         require_sphinx_strict=values.get("require_sphinx_strict") is True,
         fail_on_warning=values.get("fail_on_warning") is True,
+        os_release=text("os_release"),
     )
 
 
@@ -225,6 +242,14 @@ def audit_config(
     resolved.rtd_python = check_rtd_python(
         config, location, settings.python_version, audit
     )
+
+    parity = check_parity(
+        config, location, resolved.build_os, resolved.runner_os, audit
+    )
+    resolved.runner = parity.runner
+    resolved.apt_packages = parity.apt_packages
+    resolved.build_jobs = parity.build_jobs
+    resolved.build_commands = parity.build_commands
 
 
 def audit_tox(root: Path, settings: Settings, resolved: Resolved, audit: Audit) -> None:
@@ -262,7 +287,7 @@ def audit_tox(root: Path, settings: Settings, resolved: Resolved, audit: Audit) 
 def run_audit(settings: Settings) -> Report:
     """Perform the audit and return its report."""
     audit = Audit()
-    resolved = Resolved()
+    resolved = Resolved(runner_os=read_runner_os(Path(settings.os_release)))
     root = Path(settings.path_prefix).resolve()
 
     if not root.is_dir():
