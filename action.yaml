@@ -200,6 +200,13 @@ runs:
         # Provide PyYAML
         set -euo pipefail
 
+        # Run Python from the action's own directory. -c and -m put the
+        # working directory first on sys.path, so from the caller's
+        # workspace a yaml.py or pip/ there would be imported instead.
+        # -I would also hide the --user install below, and -P needs
+        # Python 3.11+, which the runner's python3 does not promise.
+        cd "$ACTION_PATH"
+
         if python3 -c 'import yaml' 2>/dev/null; then
           echo "PyYAML already present ✅"
           exit 0
@@ -243,7 +250,6 @@ runs:
         set -uo pipefail
 
         args=(
-          --path-prefix "$INPUT_PATH_PREFIX"
           --config-file "$INPUT_CONFIG_FILE"
           --tox-file "$INPUT_TOX_FILE"
           --required-files "$INPUT_REQUIRED_FILES"
@@ -261,6 +267,18 @@ runs:
         if [ "$INPUT_FAIL_ON_WARNING" = "true" ]; then
           args+=(--fail-on-warning)
         fi
+
+        # Pass the project as an absolute path, then run the helpers from
+        # the action's own directory: python3 -m puts the working
+        # directory ahead of PYTHONPATH, so from the caller's workspace a
+        # lib/ or json.py there would be imported instead. The helpers
+        # report paths relative to the project, so outputs are unchanged.
+        case "$INPUT_PATH_PREFIX" in
+          /*) project="$INPUT_PATH_PREFIX" ;;
+          *) project="$PWD/$INPUT_PATH_PREFIX" ;;
+        esac
+        args+=(--path-prefix "$project")
+        cd "$ACTION_PATH" || exit 1
 
         report="$(PYTHONPATH="${ACTION_PATH}" \
           python3 -m lib.rtd_audit "${args[@]}")"
