@@ -116,6 +116,11 @@ under audit. An absolute value stands on its own.
 | `python_mismatch` | Whether the tox and ReadTheDocs versions diverge                 |
 | `python_eol`      | Whether the documentation Python version has reached end of life |
 | `build_os`        | The `build.os` value the project declares                        |
+| `runner`          | GitHub-hosted runner label matching `build.os`; may be empty     |
+| `runner_os`       | OS of the runner the audit ran on, as `ubuntu-<VERSION_ID>`      |
+| `apt_packages`    | Space-separated `build.apt_packages`, in declared order          |
+| `build_jobs`      | Space-separated `build.jobs` step names, in declared order       |
+| `build_commands`  | Whether the configuration declares `build.commands`              |
 | `errors`          | Count of findings at error severity                              |
 | `warnings`        | Count of findings at warning severity                            |
 | `findings_json`   | Complete audit report as a JSON string                           |
@@ -157,6 +162,27 @@ End-of-life data comes from
 [python-supported-versions-action][py-versions], so a single source holds
 the release calendar for the whole organisation.
 
+## Runner parity
+
+A documentation build often runs twice: on a GitHub runner through tox,
+and on Read the Docs. When the two environments differ, one can fail
+while the other passes. The action reports what a caller needs to
+match the Read the Docs build:
+
+- `runner` names the GitHub-hosted runner label matching `build.os`
+  (`ubuntu-22.04`, `ubuntu-24.04` or `ubuntu-26.04`). It stays empty for
+  `ubuntu-lts-latest`, which Read the Docs moves on its own schedule,
+  and for any release Read the Docs does not accept.
+- `runner_os` names the OS the audit itself ran on, read from
+  `/etc/os-release`. When it differs from `runner`, the action warns.
+- `apt_packages`, `build_jobs` and `build_commands` report the extra
+  steps Read the Docs runs that a tox build does not. The action drops
+  any package name that breaks the Debian naming rules, so a caller can
+  pass the list to `apt-get`.
+
+The step summary sets the two builds side by side in a **Runner
+parity** table.
+
 ## Findings
 
 <!-- markdownlint-disable MD013 -->
@@ -173,10 +199,16 @@ the release calendar for the whole organisation.
 | `version-unsupported`    | Error    | The configuration declares a version other than 2          |
 | `build-os-missing`       | Error    | The configuration omits `build.os`                         |
 | `python-missing`         | Error    | The configuration omits `build.tools.python`               |
+| `build-os-unsupported`   | Error    | `build.os` is empty or names a release ReadTheDocs rejects |
+| `apt-package-invalid`    | Error    | `build.apt_packages` holds an invalid package name         |
 | `required-file-missing`  | Error    | A file named by policy is absent                           |
 | `forbidden-file-present` | Error    | A file named by policy still exists                        |
 | `retired-key`            | Warning  | The configuration uses a key ReadTheDocs ignores           |
 | `build-os-mismatch`      | Warning  | `build.os` differs from the configured policy              |
+| `build-os-floating`      | Warning  | `build.os` is `ubuntu-lts-latest`; pin a release instead   |
+| `runner-os-mismatch`     | Warning  | This runner's OS differs from `build.os`                   |
+| `parity-build-jobs`      | Warning  | ReadTheDocs runs `build.jobs` steps tox does not           |
+| `parity-build-commands`  | Warning  | `build.commands` replaces the whole ReadTheDocs build      |
 | `python-policy-mismatch` | Warning  | `build.tools.python` differs from the configured policy    |
 | `python-mismatch`        | Warning  | The tox and ReadTheDocs Python versions diverge            |
 | `python-eol`             | Warning  | The documentation Python version has reached end of life   |
@@ -185,6 +217,7 @@ the release calendar for the whole organisation.
 | `sphinx-absent`          | Warning  | The tox file runs no `sphinx-build` command                |
 | `tox-unparsable`         | Warning  | The tox file does not parse                                |
 | `tox-absent`             | Notice   | No tox file found; the action skipped the tox checks       |
+| `parity-apt-packages`    | Notice   | ReadTheDocs installs APT packages a GitHub build must add  |
 
 <!-- markdownlint-enable MD013 -->
 

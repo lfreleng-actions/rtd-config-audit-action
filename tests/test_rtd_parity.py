@@ -127,7 +127,6 @@ def message_of(report: Report, code: str) -> str:
 class RunnerLabel(unittest.TestCase):
     """``build.os`` maps onto the GitHub-hosted runner of the same name."""
 
-    @unittest.expectedFailure
     def test_maps_each_pinned_release(self) -> None:
         for release in ("ubuntu-22.04", "ubuntu-24.04", "ubuntu-26.04"):
             with tempfile.TemporaryDirectory() as tmp:
@@ -137,21 +136,27 @@ class RunnerLabel(unittest.TestCase):
             self.assertNotIn("build-os-floating", codes(report))
             self.assertNotIn("build-os-unsupported", codes(report))
 
-    @unittest.expectedFailure
     def test_floating_alias_warns(self) -> None:
         code, report = run_audit("lts-latest")
         self.assertEqual(code, 0)
         self.assertEqual(report["runner"], "")
         self.assertEqual(severity_of(report, "build-os-floating"), "warning")
 
-    @unittest.expectedFailure
     def test_unsupported_release_fails(self) -> None:
         code, report = run_audit("unsupported-os")
         self.assertEqual(code, 1)
         self.assertEqual(report["runner"], "")
         self.assertEqual(severity_of(report, "build-os-unsupported"), "error")
 
-    @unittest.expectedFailure
+    def test_empty_release_fails(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            project = write_config(tmp, '  os: ""\n')
+            code, report = audit_path(project)
+        self.assertEqual(code, 1)
+        self.assertEqual(report["runner"], "")
+        self.assertEqual(severity_of(report, "build-os-unsupported"), "error")
+        self.assertNotIn("build-os-missing", codes(report))
+
     def test_missing_os_keeps_the_existing_error(self) -> None:
         _, report = run_audit("legacy")
         self.assertEqual(report["runner"], "")
@@ -162,7 +167,6 @@ class RunnerLabel(unittest.TestCase):
 class RunnerOs(unittest.TestCase):
     """The audit compares its own runner OS with ``build.os``."""
 
-    @unittest.expectedFailure
     def test_matching_release_is_quiet(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             path = os_release(tmp, "ubuntu", "24.04")
@@ -170,7 +174,6 @@ class RunnerOs(unittest.TestCase):
         self.assertEqual(report["runner_os"], "ubuntu-24.04")
         self.assertNotIn("runner-os-mismatch", codes(report))
 
-    @unittest.expectedFailure
     def test_divergent_release_warns(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             path = os_release(tmp, "ubuntu", "26.04")
@@ -182,7 +185,6 @@ class RunnerOs(unittest.TestCase):
         self.assertIn("ubuntu-26.04", message)
         self.assertIn("ubuntu-24.04", message)
 
-    @unittest.expectedFailure
     def test_other_distribution_reports_nothing(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             path = os_release(tmp, "debian", "12")
@@ -190,7 +192,6 @@ class RunnerOs(unittest.TestCase):
         self.assertEqual(report["runner_os"], "")
         self.assertNotIn("runner-os-mismatch", codes(report))
 
-    @unittest.expectedFailure
     def test_absent_file_reports_nothing(self) -> None:
         _, report = run_audit("good")
         self.assertEqual(report["runner_os"], "")
@@ -200,7 +201,6 @@ class RunnerOs(unittest.TestCase):
 class ExtraSteps(unittest.TestCase):
     """Steps Read the Docs runs that a tox build never does."""
 
-    @unittest.expectedFailure
     def test_reports_the_cps_configuration(self) -> None:
         code, report = run_audit("parity-cps")
         self.assertEqual(code, 0)
@@ -217,7 +217,6 @@ class ExtraSteps(unittest.TestCase):
         self.assertIn("pre_build", jobs)
         self.assertIn("bash docs/generate-openapi.sh", jobs)
 
-    @unittest.expectedFailure
     def test_follows_declared_order_and_drops_invalid_names(self) -> None:
         build = (
             "  os: ubuntu-24.04\n"
@@ -241,10 +240,42 @@ class ExtraSteps(unittest.TestCase):
         self.assertEqual(severity_of(report, "apt-package-invalid"), "error")
         self.assertIn("graphviz; rm -rf /", message_of(report, "apt-package-invalid"))
 
-    @unittest.expectedFailure
+    def test_reports_commands_for_each_output_format(self) -> None:
+        build = (
+            "  os: ubuntu-24.04\n"
+            "  jobs:\n"
+            "    build:\n"
+            "      html:\n"
+            "        - python -m sphinx -b html docs out/html\n"
+            "      pdf:\n"
+            "        - make latexpdf\n"
+        )
+        with tempfile.TemporaryDirectory() as tmp:
+            project = write_config(tmp, build)
+            _, report = audit_path(project)
+        self.assertEqual(report["build_jobs"], "build")
+        jobs = message_of(report, "parity-build-jobs")
+        self.assertIn("build.html (python -m sphinx -b html docs out/html)", jobs)
+        self.assertIn("build.pdf (make latexpdf)", jobs)
+
+    def test_survives_a_self_referencing_job_mapping(self) -> None:
+        build = "  os: ubuntu-24.04\n  jobs:\n    build: &job\n      html: *job\n"
+        with tempfile.TemporaryDirectory() as tmp:
+            project = write_config(tmp, build)
+            _, report = audit_path(project)
+        self.assertEqual(report["build_jobs"], "build")
+        self.assertIn("build.html", message_of(report, "parity-build-jobs"))
+
     def test_reports_build_commands(self) -> None:
         code, report = run_audit("build-commands")
         self.assertEqual(code, 0)
+        self.assertTrue(report["build_commands"])
+        self.assertEqual(severity_of(report, "parity-build-commands"), "warning")
+
+    def test_reports_a_null_build_commands_key(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            project = write_config(tmp, "  os: ubuntu-24.04\n  commands:\n")
+            _, report = audit_path(project)
         self.assertTrue(report["build_commands"])
         self.assertEqual(severity_of(report, "parity-build-commands"), "warning")
 
@@ -252,7 +283,6 @@ class ExtraSteps(unittest.TestCase):
 class GoodFixtureParity(unittest.TestCase):
     """A compliant project gains nothing beyond the runner comparison."""
 
-    @unittest.expectedFailure
     def test_reports_a_runner_and_no_new_findings(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             path = os_release(tmp, "ubuntu", "24.04")
@@ -265,7 +295,6 @@ class GoodFixtureParity(unittest.TestCase):
         self.assertEqual(report["warnings"], 0)
         self.assertFalse(codes(report) & PARITY_CODES)
 
-    @unittest.expectedFailure
     def test_a_different_runner_adds_only_the_comparison(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             path = os_release(tmp, "ubuntu", "26.04")
@@ -276,7 +305,6 @@ class GoodFixtureParity(unittest.TestCase):
 class OutputWiring(unittest.TestCase):
     """Every parity value reaches the action's outputs."""
 
-    @unittest.expectedFailure
     def test_emit_outputs_publishes_each_value(self) -> None:
         sys.path.insert(0, str(REPO_ROOT))
         from lib.emit_outputs import SCALAR_KEYS  # noqa: PLC0415
@@ -284,7 +312,6 @@ class OutputWiring(unittest.TestCase):
         for key in PARITY_OUTPUTS:
             self.assertIn(key, SCALAR_KEYS)
 
-    @unittest.expectedFailure
     def test_action_declares_each_output(self) -> None:
         action = cast(
             "dict[str, object]",
@@ -324,7 +351,6 @@ def summary_of(report: dict[str, object]) -> str:
 class SummaryParity(unittest.TestCase):
     """The step summary sets the two builds side by side."""
 
-    @unittest.expectedFailure
     def test_section_follows_the_property_table(self) -> None:
         text = summary_of(parity_report())
         self.assertIn("Runner parity", text)
@@ -333,14 +359,12 @@ class SummaryParity(unittest.TestCase):
         self.assertIn("| OS | `ubuntu-24.04` | `ubuntu-24.04` | ✅ |", text)
         self.assertIn("| Python | `3.13` | `3.13` | ✅ |", text)
 
-    @unittest.expectedFailure
     def test_omits_empty_rows(self) -> None:
         text = summary_of(parity_report())
         self.assertIn("| OS |", text)
         self.assertNotIn("APT packages", text)
         self.assertNotIn("Build jobs", text)
 
-    @unittest.expectedFailure
     def test_flags_divergence(self) -> None:
         text = summary_of(
             parity_report(

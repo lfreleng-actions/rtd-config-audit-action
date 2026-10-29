@@ -126,6 +126,25 @@ outputs:
   build_os:
     description: "The build.os value the project declares"
     value: ${{ steps.audit.outputs.build_os }}
+  runner:
+    # yamllint disable-line rule:line-length
+    description: "GitHub-hosted runner label matching build.os; empty when build.os floats, is unsupported or is absent"
+    value: ${{ steps.audit.outputs.runner }}
+  runner_os:
+    # yamllint disable-line rule:line-length
+    description: "OS of the runner the audit ran on, as ubuntu-<VERSION_ID>; empty off Ubuntu"
+    value: ${{ steps.audit.outputs.runner_os }}
+  apt_packages:
+    # yamllint disable-line rule:line-length
+    description: "Space-separated build.apt_packages, in declared order; invalid names are dropped"
+    value: ${{ steps.audit.outputs.apt_packages }}
+  build_jobs:
+    # yamllint disable-line rule:line-length
+    description: "Space-separated build.jobs step names, in declared order"
+    value: ${{ steps.audit.outputs.build_jobs }}
+  build_commands:
+    description: "Whether the configuration declares build.commands"
+    value: ${{ steps.audit.outputs.build_commands }}
   errors:
     description: "Count of findings at error severity"
     value: ${{ steps.audit.outputs.errors }}

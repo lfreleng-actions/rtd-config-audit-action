@@ -21,6 +21,19 @@ RETIRED_KEYS = {
     "python.version": "Read the Docs ignores 'python.version'; use 'build.tools.python' instead.",
 }
 
+#: Fixed ``build.os`` releases Read the Docs accepts. GitHub names its
+#: hosted runners the same way, so each maps to the runner label it spells.
+PINNED_BUILD_OS = ("ubuntu-22.04", "ubuntu-24.04", "ubuntu-26.04")
+
+#: The ``build.os`` alias Read the Docs moves on its own schedule.
+FLOATING_BUILD_OS = "ubuntu-lts-latest"
+
+#: Debian package name rules; a caller hands these names to ``apt-get``.
+APT_PACKAGE_NAME = re.compile(r"[a-z0-9][a-z0-9+.-]+")
+
+#: Where the audit reads the OS of the runner it runs on.
+OS_RELEASE = "/etc/os-release"
+
 SEVERITY_ERROR = "error"
 SEVERITY_WARNING = "warning"
 SEVERITY_NOTICE = "notice"
