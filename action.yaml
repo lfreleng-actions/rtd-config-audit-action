@@ -196,17 +196,19 @@ runs:
 
         echo "Inputs validated ✅"
 
-    # Reuse the organisation's Python release calendar rather than
-    # carrying a second copy here. The action tolerates a project with no
-    # Python metadata, falling back to the currently supported set, which
-    # is exactly what a documentation-only repository needs.
+    # Reuse the organisation's release calendar from
+    # supported-versions-action rather than carrying a second copy here.
+    # A documentation-only repository has no Python metadata; should the
+    # action fail on one, continue-on-error leaves the supported set
+    # empty and the audit skips the version check.
     - name: "Determine supported Python versions"
       id: supported
       if: inputs.offline_mode != 'true'
       # yamllint disable-line rule:line-length
-      uses: lfreleng-actions/python-supported-versions-action@8eb4ab82a1240088d233a0a6df5580b9ed505670  # v0.3.2
+      uses: lfreleng-actions/supported-versions-action@03b92a8beb19378d01f3bb473653dfc2c9adc834  # v0.0.1
       continue-on-error: true
       with:
+        tool: python
         path_prefix: ${{ inputs.path_prefix }}
         eol_behaviour: "warn"
 

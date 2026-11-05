@@ -200,7 +200,7 @@ jobs:
           done
           echo "Planted modules in $PWD ✅"
 
-      # offline_mode skips python-supported-versions-action, so only
+      # offline_mode skips supported-versions-action, so only
       # this action's own Python runs while the planted modules exist.
       - name: "Audit a compliant project"
         id: planted
