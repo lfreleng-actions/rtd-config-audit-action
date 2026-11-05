@@ -159,7 +159,7 @@ interpreter from the published build tests something other than what
 readers receive.
 
 End-of-life data comes from
-[python-supported-versions-action][py-versions], so a single source holds
+[supported-versions-action][py-versions], so a single source holds
 the release calendar for the whole organisation.
 
 ## Runner parity
@@ -254,7 +254,7 @@ linkcheck environment, unparsable YAML and a project with no config.
 and checks that it installs PyYAML from a hash-pinned file, never by
 bare package name.
 
-[py-versions]: https://github.com/lfreleng-actions/python-supported-versions-action
+[py-versions]: https://github.com/lfreleng-actions/supported-versions-action
 
 [pre-commit.ci results page]: https://results.pre-commit.ci/latest/github/lfreleng-actions/rtd-config-audit-action/main
 <!-- markdownlint-disable-next-line MD013 -->
