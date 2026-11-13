@@ -72,7 +72,6 @@ def python_steps() -> list[dict[str, object]]:
 class ActionInterpreter(unittest.TestCase):
     """The action chooses its interpreter rather than the caller's PATH."""
 
-    @unittest.expectedFailure
     def test_setup_python_is_pinned_and_leaves_path_alone(self) -> None:
         steps = [s for s in action_steps() if s.get("id") == PYTHON_STEP_ID]
         self.assertEqual(len(steps), 1, "no setup-python step with id 'python'")
@@ -83,19 +82,16 @@ class ActionInterpreter(unittest.TestCase):
         inputs = cast("dict[str, object]", step.get("with") or {})
         self.assertIn(str(inputs.get("update-environment")).lower(), {"false"})
 
-    @unittest.expectedFailure
     def test_setup_python_runs_before_any_python(self) -> None:
         ids = [step.get("id") for step in action_steps()]
         first_python = min(ids.index(step.get("id")) for step in python_steps())
         self.assertLess(ids.index(PYTHON_STEP_ID), first_python)
 
-    @unittest.expectedFailure
     def test_no_step_runs_python_from_path(self) -> None:
         for step in action_steps():
             for line in script_lines(step):
                 self.assertIsNone(BARE_PYTHON.search(line), f"{step.get('id')}: {line}")
 
-    @unittest.expectedFailure
     def test_python_steps_bind_the_setup_python_output(self) -> None:
         self.assertTrue(python_steps(), "no step runs the trusted interpreter")
         for step in python_steps():
@@ -143,7 +139,6 @@ def launch(
 class Launcher(unittest.TestCase):
     """The launcher runs the action's own helpers under ``python -I``."""
 
-    @unittest.expectedFailure
     def test_runs_the_named_helper(self) -> None:
         report = {"findings": [{"severity": "error", "code": "x", "message": "m"}]}
         with tempfile.TemporaryDirectory() as tmp:
@@ -155,7 +150,6 @@ class Launcher(unittest.TestCase):
             self.assertEqual(result.stdout, "::error title=RTD audit%3A x::m\n")
             self.assertFalse(marker.exists(), "imported a planted module")
 
-    @unittest.expectedFailure
     def test_passes_arguments_and_exit_status(self) -> None:
         project = REPO_ROOT / "tests" / "fixtures" / "good"
         with tempfile.TemporaryDirectory() as tmp:
@@ -262,11 +256,9 @@ class DependencyInstall(unittest.TestCase):
             )
             self.assertEqual(imported.stdout.strip(), "stub", imported.stderr)
 
-    @unittest.expectedFailure
     def test_pip_user_cannot_redirect_the_install(self) -> None:
         self.run_deps({"PIP_USER": "true"})
 
-    @unittest.expectedFailure
     def test_pip_config_file_cannot_redirect_the_install(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             config = Path(tmp) / "pip.conf"

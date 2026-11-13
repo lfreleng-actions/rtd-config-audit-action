@@ -226,15 +226,24 @@ Errors fail the action. Warnings fail it when `fail_on_warning` is
 
 ## Runtime dependencies
 
-The audit needs PyYAML. When the runner's `python3` lacks it, the action
-installs the version pinned in [`requirements.txt`](requirements.txt)
-with `pip install --user --require-hashes`, so every run gets the
-version the unit tests cover, verified against its published hashes.
-The install needs access to PyPI.
+The action runs its Python helpers on an interpreter it sets up itself
+with `actions/setup-python` (Python 3.13, `update-environment: false`),
+never on whichever `python3` the caller's `PATH` finds first. It starts
+that interpreter with `-I`, so the caller's environment variables,
+working directory and user site cannot change which modules it imports.
+With `update-environment` off, the step leaves the caller's `PATH` and
+environment unchanged.
 
-A system Python marked externally managed (PEP 668) refuses the
-install. Use `actions/setup-python` first, install PyYAML through the
-system package manager, or set `PIP_BREAK_SYSTEM_PACKAGES=1`.
+The audit needs PyYAML. When that interpreter lacks it, the action
+installs the version pinned in [`requirements.txt`](requirements.txt)
+into it with `pip install --require-hashes`, so every run gets the
+version the unit tests cover, verified against its published hashes.
+It runs pip with `--isolated` and a null `PIP_CONFIG_FILE`, so the
+caller's `PIP_*` variables and `pip.conf` files, such as `PIP_USER` or
+an install `target`, cannot place PyYAML where the audit cannot import
+it. That also ignores any index or mirror the caller configures, so the
+install needs access to PyPI; the setup needs a Python 3.13 in the
+runner's tool cache or access to download one.
 
 ## Testing
 
@@ -252,7 +261,10 @@ linkcheck environment, unparsable YAML and a project with no config.
 
 `tests/test_action_deps.py` reads the install step from `action.yaml`
 and checks that it installs PyYAML from a hash-pinned file, never by
-bare package name.
+bare package name. `tests/test_action_python.py` checks that every
+step runs that interpreter with `-I` and never a `python3` from `PATH`,
+and runs the install step against a fresh virtual environment to show
+that `PIP_USER` or a `PIP_CONFIG_FILE` cannot move PyYAML out of reach.
 
 [py-versions]: https://github.com/lfreleng-actions/supported-versions-action
 
