@@ -212,23 +212,34 @@ runs:
         path_prefix: ${{ inputs.path_prefix }}
         eol_behaviour: "warn"
 
+    # Choose the interpreter here rather than run whichever python3 the
+    # caller's PATH finds first. With update-environment off,
+    # setup-python reports the interpreter's path and leaves the
+    # caller's PATH and environment as they were.
+    - name: "Set up Python"
+      id: python
+      # yamllint disable-line rule:line-length
+      uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0  # v7.1.0
+      with:
+        python-version: "3.13"
+        update-environment: false
+
     - name: "Provide PyYAML"
       id: deps
       shell: bash
       env:
         ACTION_PATH: ${{ github.action_path }}
+        PYTHON: ${{ steps.python.outputs.python-path }}
       run: |
         # Provide PyYAML
         set -euo pipefail
 
-        # Run Python from the action's own directory. -c and -m put the
-        # working directory first on sys.path, so from the caller's
-        # workspace a yaml.py or pip/ there would be imported instead.
-        # -I would also hide the --user install below, and -P needs
-        # Python 3.11+, which the runner's python3 does not promise.
+        # -I keeps the caller's environment, working directory and user
+        # site off sys.path, so a yaml.py or pip/ in the caller's
+        # workspace is never imported in place of the real module.
         cd "$ACTION_PATH"
 
-        if python3 -c 'import yaml' 2>/dev/null; then
+        if "$PYTHON" -I -c 'import yaml' 2>/dev/null; then
           echo "PyYAML already present ✅"
           exit 0
         fi
@@ -236,15 +247,23 @@ runs:
         echo "Installing PyYAML..."
         # Install the version the unit tests run against, hash-checked,
         # so the caller's job never runs whatever PyPI serves on the day.
-        # --user keeps the install out of a system directory the runner
-        # may protect; --quiet keeps the log readable.
-        if python3 -m pip install --user --quiet --require-hashes \
-            -r "$ACTION_PATH/requirements.txt"; then
-          echo "Installed PyYAML ✅"
-        else
+        # Install into the interpreter setup-python provided, not --user:
+        # -I hides the user site. -I does not reach pip's own settings,
+        # so --isolated drops the caller's PIP_* variables and the null
+        # PIP_CONFIG_FILE skips every pip.conf; otherwise PIP_USER,
+        # PIP_TARGET or a config file could put PyYAML where the audit
+        # cannot import it. --quiet keeps the log readable.
+        if ! PIP_CONFIG_FILE=/dev/null "$PYTHON" -I -m pip install \
+            --isolated --disable-pip-version-check --quiet \
+            --require-hashes -r "$ACTION_PATH/requirements.txt"; then
           echo 'Error: could not install PyYAML ❌'
           exit 1
         fi
+        if ! "$PYTHON" -I -c 'import yaml'; then
+          echo 'Error: installed PyYAML is not importable ❌'
+          exit 1
+        fi
+        echo "Installed PyYAML ✅"
 
     - name: "Audit ReadTheDocs configuration"
       id: audit
@@ -266,6 +285,7 @@ runs:
         INPUT_SUMMARY: ${{ inputs.summary }}
         SUPPORTED_VERSIONS: ${{ steps.supported.outputs.supported_versions }}
         ACTION_PATH: ${{ github.action_path }}
+        PYTHON: ${{ steps.python.outputs.python-path }}
       run: |
         # Audit ReadTheDocs configuration
         set -uo pipefail
@@ -290,10 +310,11 @@ runs:
         fi
 
         # Pass the project as an absolute path, then run the helpers from
-        # the action's own directory: python3 -m puts the working
-        # directory ahead of PYTHONPATH, so from the caller's workspace a
-        # lib/ or json.py there would be imported instead. The helpers
-        # report paths relative to the project, so outputs are unchanged.
+        # the action's own directory. -I keeps the caller's environment,
+        # working directory and user site off sys.path, so a lib/ or
+        # json.py in the caller's workspace is never imported; launch.py
+        # puts back only the action's own directory. The helpers report
+        # paths relative to the project, so outputs are unchanged.
         case "$INPUT_PATH_PREFIX" in
           /*) project="$INPUT_PATH_PREFIX" ;;
           *) project="$PWD/$INPUT_PATH_PREFIX" ;;
@@ -301,8 +322,8 @@ runs:
         args+=(--path-prefix "$project")
         cd "$ACTION_PATH" || exit 1
 
-        report="$(PYTHONPATH="${ACTION_PATH}" \
-          python3 -m lib.rtd_audit "${args[@]}")"
+        report="$("$PYTHON" -I "$ACTION_PATH/lib/launch.py" \
+          lib.rtd_audit "${args[@]}")"
         status=$?
 
         # Surface the report in the job log whatever the outcome.
@@ -312,18 +333,18 @@ runs:
         # heredoc block for the full report, so a value containing
         # newlines cannot inject further keys.
         printf '%s' "$report" \
-          | PYTHONPATH="${ACTION_PATH}" python3 -m lib.emit_outputs \
+          | "$PYTHON" -I "$ACTION_PATH/lib/launch.py" lib.emit_outputs \
           >> "$GITHUB_OUTPUT"
 
         if [ "$INPUT_SUMMARY" = "true" ]; then
           printf '%s' "$report" \
-            | PYTHONPATH="${ACTION_PATH}" python3 -m lib.render_summary \
+            | "$PYTHON" -I "$ACTION_PATH/lib/launch.py" lib.render_summary \
             >> "$GITHUB_STEP_SUMMARY"
         fi
 
         # Repeat findings as workflow annotations so they appear against
         # the run rather than only inside the log.
         printf '%s' "$report" \
-          | PYTHONPATH="${ACTION_PATH}" python3 -m lib.render_annotations
+          | "$PYTHON" -I "$ACTION_PATH/lib/launch.py" lib.render_annotations
 
         exit "$status"
