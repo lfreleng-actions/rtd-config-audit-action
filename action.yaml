@@ -205,7 +205,7 @@ runs:
       id: supported
       if: inputs.offline_mode != 'true'
       # yamllint disable-line rule:line-length
-      uses: lfreleng-actions/supported-versions-action@03b92a8beb19378d01f3bb473653dfc2c9adc834  # v0.0.1
+      uses: lfreleng-actions/supported-versions-action@dbe30689f59131d86b5ac0c757f26e759172ebc1  # v0.2.0
       continue-on-error: true
       with:
         tool: python
