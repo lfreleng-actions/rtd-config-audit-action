@@ -7,7 +7,7 @@
 
 <!-- prettier-ignore-start -->
 <!-- markdownlint-disable-next-line MD013 -->
-[![Linux Foundation](https://img.shields.io/badge/Linux-Foundation-blue)](https://linuxfoundation.org/) [![Source Code](https://img.shields.io/badge/GitHub-100000?logo=github&logoColor=white&color=blue)](https://github.com/lfreleng-actions/rtd-config-audit-action) [![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](https://opensource.org/licenses/Apache-2.0) [![pre-commit.ci status badge]][pre-commit.ci results page] [![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/lfreleng-actions/rtd-config-audit-action/badge)](https://scorecard.dev/viewer/?uri=github.com/lfreleng-actions/rtd-config-audit-action)
+[![Linux Foundation](https://img.shields.io/badge/Linux-Foundation-blue)](https://linuxfoundation.org/) [![Source Code](https://img.shields.io/badge/GitHub-100000?logo=github&logoColor=white&color=blue)](https://github.com/lfreleng-actions/rtd-config-audit-action) [![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](https://opensource.org/licenses/Apache-2.0) [![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/lfreleng-actions/rtd-config-audit-action/badge)](https://scorecard.dev/viewer/?uri=github.com/lfreleng-actions/rtd-config-audit-action)
 <!-- prettier-ignore-end -->
 
 ## rtd-config-audit-action
@@ -267,7 +267,3 @@ and runs the install step against a fresh virtual environment to show
 that `PIP_USER` or a `PIP_CONFIG_FILE` cannot move PyYAML out of reach.
 
 [py-versions]: https://github.com/lfreleng-actions/supported-versions-action
-
-[pre-commit.ci results page]: https://results.pre-commit.ci/latest/github/lfreleng-actions/rtd-config-audit-action/main
-<!-- markdownlint-disable-next-line MD013 -->
-[pre-commit.ci status badge]: https://results.pre-commit.ci/badge/github/lfreleng-actions/rtd-config-audit-action/main.svg
